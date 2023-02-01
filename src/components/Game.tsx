@@ -26,6 +26,9 @@ const Cell = ({ x, y }: CellType) => {
 const Game = () => {
   const [cells, setCells] = useState<CellType[]>([]);
   const [board, setBoard] = useState<boolean[][]>([]);
+  const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [interval, setInterval] = useState<number>(100);
+  const [timeout, setTimeout] = useState<number | null>(null);
   let rows = HEIGHT / CELL_SIZE,
     cols = WIDTH / CELL_SIZE;
   const boardRef = useRef<HTMLDivElement | null>(null);
@@ -51,7 +54,6 @@ const Game = () => {
         }
       }
     }
-    console.log(cells);
     return cells;
   };
 
@@ -89,6 +91,86 @@ const Game = () => {
     });
   };
 
+  const runGame = () => {
+    setIsRunning(true);
+  };
+
+  const stopGame = () => {
+    setIsRunning(false);
+  };
+
+  const runIteration = () => {
+    let newBoard = makeEmptyBoard();
+
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        let neighbors = calculateNeighbors(x, y);
+        if (board[y][x]) {
+          if (neighbors === 2 || neighbors === 3) {
+            newBoard[y][x] = true;
+          } else {
+            newBoard[y][x] = false;
+          }
+        } else {
+          if (!board[y][x] && neighbors === 3) {
+            newBoard[y][x] = true;
+          }
+        }
+      }
+    }
+    setBoard(newBoard);
+  };
+
+  /**
+   * Calculate the number of neighbors at point (x, y)
+   * @param {Array} board
+   * @param {int} x
+   * @param {int} y
+   */
+  const calculateNeighbors = (x: number, y: number) => {
+    let neighbors = 0;
+    const dirs = [
+      [-1, -1],
+      [-1, 0],
+      [-1, 1],
+      [0, 1],
+      [1, 1],
+      [1, 0],
+      [1, -1],
+      [0, -1],
+    ];
+    for (let i = 0; i < dirs.length; i++) {
+      const dir = dirs[i];
+      let y1 = y + dir[0];
+      let x1 = x + dir[1];
+
+      if (x1 >= 0 && x1 < cols && y1 >= 0 && y1 < rows && board[y1][x1]) {
+        neighbors++;
+      }
+    }
+
+    return neighbors;
+  };
+
+  const handleIntervalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInterval(parseInt(e.target.value));
+  };
+
+  const handleClear = () => {
+    setBoard(makeEmptyBoard());
+  };
+
+  const handleRandom = () => {
+    let board: boolean[][] = [[]];
+    for (let y = 0; y < rows; y++) {
+      board[y] = [];
+      for (let x = 0; x < cols; x++) {
+        board[y][x] = Math.random() >= 0.5;
+      }
+    }
+    setBoard(board);
+  };
+
   useEffect(() => {
     setBoard(makeEmptyBoard());
   }, []);
@@ -96,8 +178,24 @@ const Game = () => {
   useEffect(() => {
     if (board.length) {
       setCells(makeCells());
+      if (isRunning) {
+        setTimeout(
+          window.setTimeout(() => {
+            runIteration();
+          }, interval)
+        );
+      }
     }
   }, [board]);
+
+  useEffect(() => {
+    if (isRunning) {
+      runIteration();
+    } else if (timeout) {
+      window.clearTimeout(timeout);
+      setTimeout(null);
+    }
+  }, [isRunning]);
 
   return (
     <div>
@@ -109,11 +207,29 @@ const Game = () => {
           backgroundSize: `${CELL_SIZE}px ${CELL_SIZE}px`,
         }}
         onClick={handleClick}
-        ref={boardRef}
-      >
+        ref={boardRef}>
         {cells.map((cell) => (
           <Cell x={cell.x} y={cell.y} key={`${cell.x},${cell.y}`} />
         ))}
+      </div>
+      <div className="controls">
+        Update every <input value={interval} onChange={handleIntervalChange} />{" "}
+        msec
+        {isRunning ? (
+          <button className="button" onClick={stopGame}>
+            Stop
+          </button>
+        ) : (
+          <button className="button" onClick={runGame}>
+            Run
+          </button>
+        )}{" "}
+        <button disabled={isRunning} className="button" onClick={handleRandom}>
+          Random
+        </button>
+        <button disabled={isRunning} className="button" onClick={handleClear}>
+          Clear
+        </button>
       </div>
     </div>
   );
